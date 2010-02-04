@@ -2,31 +2,14 @@
 
 import wsgiref.handlers
 import uuid
-import urllib
 import string
+import logging
 from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import template
+from google.appengine.api import urlfetch
 from urlparse import urlparse
-
-ALPHABET = string.ascii_uppercase + string.ascii_lowercase + \
-           string.digits + '-_.'
-ALPHABET_REVERSE = dict((c, i) for (i, c) in enumerate(ALPHABET))
-BASE = len(ALPHABET)
-
-def num_encode(n):
-    s = []
-    while True:
-        n, r = divmod(n, BASE)
-        s.append(ALPHABET[r])
-        if n == 0: break
-    return ''.join(reversed(s))
-
-def num_decode(s):
-    n = 0
-    for c in s:
-        n = n * BASE + ALPHABET_REVERSE[c]
-    return n
+from google.appengine.api import memcache
 
 class GridUrl(db.Model):
     service = db.StringProperty(required = True)
@@ -34,6 +17,26 @@ class GridUrl(db.Model):
     created = db.DateTimeProperty(auto_now_add = True)
     updated = db.DateTimeProperty(auto_now = True)
     
+    def save(self):
+        self.put()
+        memcache.set(self.service, str(self.url))
+      
+    @staticmethod
+    def load(service, only_cache = False):
+        url = memcache.get(service)
+        if (url is None) and (not only_cache):
+            url = GridUrl.get_by_key_name("service_%s" % str(service))
+            if url is not None:
+                url = str(url.url)
+                memcache.set(service, url)
+                return url
+            else:
+                return none
+        elif url is not None:
+            return url
+        else:
+            return None
+ 
 class RegistrationHandler(webapp.RequestHandler):
     def get(self):
         self.response.headers["Content-type"] = "text/plain"
@@ -45,7 +48,7 @@ class RegistrationHandler(webapp.RequestHandler):
             url = self.request.get("url")
             key = "service_%s" % str(service)
             gridUrl = GridUrl(key_name = key, service = str(service), url = url)
-            gridUrl.put()
+            gridUrl.save()
             self.response.out.write("OK");
         except Exception, ex:
             self.response.set_status(503)
@@ -56,13 +59,13 @@ class GoHandler(webapp.RequestHandler):
     def get(self):
         self.response.headers["Content-type"] = "text/plain"
         try:
-            service = uuid.UUID("{" + self.request.path.split("/")[2] + "}")
-            gridUrl = GridUrl.get_by_key_name("service_%s" % str(service))
-            if gridUrl is None:
+            url = GridUrl.load(self.request.path.split("/")[2])
+            if url is None:
                 raise Exception("Service not found")
-            url = str(gridUrl.url)
+
             if self.request.query != "":
                 url += "?" + self.request.query
+
             self.response.set_status(302)
             self.response.headers["Location"] = url
             self.response.out.write(url)
@@ -70,16 +73,47 @@ class GoHandler(webapp.RequestHandler):
             self.response.set_status(404)
             self.response.out.write("ERROR^" + ex.message);
             return
+        
+    def post(self):
+        try:
+            url = GridUrl.load(self.request.path.split("/")[2])
+            if url is None:
+                raise Exception("Service not found")
+            
+            if self.request.query != "":
+                url += "?" + self.request.query
+            
+            content_type = self.request.headers.get("Content-Type", "application/x-www-form-urlencoded")
+
+            res = urlfetch.fetch(url = url,
+                                 method = urlfetch.POST,
+                                 payload = self.request.body,
+                                 headers = {"Content-Type": content_type}
+            )
+
+            self.response.headers["content-type"] = res.headers["content-type"]
+
+            for h in res.headers:
+                if h.find("x-secondlife") == 0:
+                    self.response.headers[h] = res.headers[h]
+            
+            self.response.set_status(res.status_code)
+            self.response.out.write(res.content)
+        except Exception, ex:
+            self.response.headers["Content-type"] = "text/plain"
+            self.response.set_status(404)
+            self.response.out.write("ERROR^" + ex.message);
+            return
+        
 
 class FetchHandler(webapp.RequestHandler):
     def get(self):
         self.response.headers["Content-type"] = "text/plain"
         try:
-            service = uuid.UUID("{" + self.request.path.split("/")[2] + "}")
-            gridUrl = GridUrl.get_by_key_name("service_%s" % str(service))
+            gridUrl = GridUrl.load(self.request.path.split("/")[2])
             if gridUrl is None:
                 raise Exception("Service not found")
-            self.response.out.write(str(gridUrl.url))
+            self.response.out.write(gridUrl)
         except Exception, ex:
             self.response.set_status(404)
             self.response.out.write("ERROR^" + ex.message);
