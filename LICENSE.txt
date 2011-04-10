@@ -1,4 +1,4 @@
-Copyright (c) 2010 Latif Khalifa
+Copyright (c) 2009-20111 Latif Khalifa
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

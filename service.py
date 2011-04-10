@@ -52,7 +52,7 @@ class RegistrationHandler(webapp.RequestHandler):
             self.response.out.write("OK");
         except Exception, ex:
             self.response.set_status(503)
-            self.response.out.write("ERROR^" + ex.message);
+            self.response.out.write("ERROR^" + str(ex.message));
             return
 
 class GoHandler(webapp.RequestHandler):
@@ -71,7 +71,7 @@ class GoHandler(webapp.RequestHandler):
             self.response.out.write(url)
         except Exception, ex:
             self.response.set_status(404)
-            self.response.out.write("ERROR^" + ex.message);
+            self.response.out.write("ERROR^" + str(ex.message));
             return
         
     def post(self):
@@ -102,7 +102,7 @@ class GoHandler(webapp.RequestHandler):
         except Exception, ex:
             self.response.headers["Content-type"] = "text/plain"
             self.response.set_status(404)
-            self.response.out.write("ERROR^" + ex.message);
+            self.response.out.write("ERROR^" + str(ex.message));
             return
         
 
@@ -116,5 +116,5 @@ class FetchHandler(webapp.RequestHandler):
             self.response.out.write(gridUrl)
         except Exception, ex:
             self.response.set_status(404)
-            self.response.out.write("ERROR^" + ex.message);
+            self.response.out.write("ERROR^" + str(ex.message));
             return
