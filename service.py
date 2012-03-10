@@ -31,7 +31,7 @@ class GridUrl(db.Model):
                 memcache.set(service, url)
                 return url
             else:
-                return none
+                return None
         elif url is not None:
             return url
         else:
@@ -76,7 +76,9 @@ class GoHandler(webapp.RequestHandler):
         
     def post(self):
         try:
-            url = GridUrl.load(self.request.path.split("/")[2])
+            service = self.request.path.split("/")[2]
+            url = GridUrl.load(service)
+                    
             if url is None:
                 raise Exception("Service not found")
             
@@ -84,7 +86,7 @@ class GoHandler(webapp.RequestHandler):
                 url += "?" + self.request.query
             
             content_type = self.request.headers.get("Content-Type", "application/x-www-form-urlencoded")
-
+            
             res = urlfetch.fetch(url = url,
                                  method = urlfetch.POST,
                                  payload = self.request.body,
@@ -100,6 +102,12 @@ class GoHandler(webapp.RequestHandler):
             self.response.set_status(res.status_code)
             self.response.out.write(res.content)
         except Exception, ex:
+            slreq = ""
+            for h in self.request.headers:
+                if h.lower().find("x-secondlife") == 0:
+                    slreq += "%s: %s\n" % (h, self.request.headers[h])
+            if slreq:
+                logging.debug("Headers: %s" % (slreq))
             self.response.headers["Content-type"] = "text/plain"
             self.response.set_status(404)
             self.response.out.write("ERROR^" + str(ex.message));
