@@ -1,0 +1,1 @@
+As Second Life objects gain capability to handle incoming HTTP requests, one problem remains. The URLs of incoming http connections change. This code that can be installed on google app engine helps making persistent URLs.
